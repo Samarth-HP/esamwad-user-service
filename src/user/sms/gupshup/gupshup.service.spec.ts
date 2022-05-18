@@ -117,6 +117,7 @@ describe('Gupshup service Error Response', () => {
     }).compile();
     service = module.get<GupshupService>(GupshupService);
   });
+
   it('Error Response', async () => {
     const resp1 = await service
       .send({
@@ -149,9 +150,6 @@ describe('Gupshup service Success With Incorrect response', () => {
 
   beforeEach(async () => {
     const mockedGot = got as jest.Mocked<typeof got>;
-    mockedGot.get.mockResolvedValueOnce({
-      body: undefined,
-    });
     const module: TestingModule = await Test.createTestingModule({
       providers: [getGupsupuFactory(mockedGot)],
     }).compile();
@@ -162,5 +160,109 @@ describe('Gupshup service Success With Incorrect response', () => {
     expect(service.parseResponse(undefined)).toHaveProperty('messageID', null)
     expect(service.parseResponse(undefined)).toHaveProperty('providerSuccessResponse', null)
     expect(service.parseResponse(undefined)).toHaveProperty('providerResponseCode', null)
+  });
+});
+
+//Testing the verify function
+describe('Gupshup service track negative cases', () => {
+  let service: GupshupService;
+
+  beforeEach(async () => {
+    const mockedGot = got as jest.Mocked<typeof got>;
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [getGupsupuFactory(mockedGot)],
+    }).compile();
+    service = module.get<GupshupService>(GupshupService);
+  });
+
+  it('track with null data throws error', () => {
+    expect(service.track).toThrowError('Data cannot be null');
+  });
+
+  it('track method for hsm not implemented', () => {
+    expect(() =>
+      service.track({
+        phone: '8004472230',
+        template: 'abc',
+        params: 'abc',
+        type: SMSType.hsm,
+      }),
+    ).toThrowError('Method not implemented.');
+  });
+});
+
+describe('Gupshup service track positive case', () => {
+  let service: GupshupService;
+
+  beforeEach(async () => {
+    const mockedGot = got as jest.Mocked<typeof got>;
+    mockedGot.get.mockResolvedValueOnce({
+      body: 'success | 919XXXXXXXXX | 3545913275288024429 | OTP matched ',
+    });
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [getGupsupuFactory(mockedGot)],
+    }).compile();
+    service = module.get<GupshupService>(GupshupService);
+  });
+  it('track method correct response', async () => {
+    const rep2 = await service
+      .track({
+        phone: '8004472230',
+        template: 'abc',
+        params: 'abc',
+        type: SMSType.otp,
+      })
+      .then((data) => {
+        expect(data).toEqual({
+          provider: 'Gupshup',
+          phone: '8004472230',
+          networkResponseCode: 200,
+          messageID: '3545913275288024429',
+          error: null,
+          providerResponseCode: null,
+          providerSuccessResponse: 'OTP matched',
+          status: 'success',
+        });
+      });
+  });
+});
+
+describe('Gupshup service track error response', () => {
+  let service: GupshupService;
+
+  beforeEach(async () => {
+    const mockedGot = got as jest.Mocked<typeof got>;
+    mockedGot.get.mockResolvedValueOnce({
+      body: undefined,
+    });
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [getGupsupuFactory(mockedGot)],
+    }).compile();
+    service = module.get<GupshupService>(GupshupService);
+  });
+  it('track method error response', async () => {
+    const rep2 = await service
+      .track({
+        phone: '8004472230',
+        template: 'abc',
+        params: 'abc',
+        type: SMSType.otp,
+      })
+      .then((data) => {
+        expect(data).toEqual({
+          provider: 'Gupshup',
+          phone: '8004472230',
+          networkResponseCode: 200,
+          messageID: null,
+          error: {
+            errorText:
+              "Gupshup response could not be parsed :: Cannot read property 'split' of undefined; Provider Response - undefined",
+            errorCode: 'CUSTOM ERROR',
+          },
+          providerResponseCode: null,
+          providerSuccessResponse: null,
+          status: 'failure',
+        });
+      });
   });
 });
